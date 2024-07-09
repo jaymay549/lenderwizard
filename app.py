@@ -244,8 +244,16 @@ def run_stream(user_input):
 
 def render_chat():
     for chat in st.session_state.chat_log:
-        with st.chat_message(chat["name"]):
-            st.markdown(chat["msg"], True)
+        if chat["name"] == "user":
+            st.markdown(
+                f'<div class="chat-message user"><div class="message-content">{chat["msg"]}</div></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="chat-message assistant"><div class="message-content">{chat["msg"]}</div></div>',
+                unsafe_allow_html=True,
+            )
 
 if "tool_call" not in st.session_state:
     st.session_state.tool_calls = []
@@ -262,46 +270,4 @@ def disable_form():
 def login():
     if st.session_state["authentication_status"] is False:
         st.error("Username/password is incorrect")
-    elif st.session_state["authentication_status"] is None:
-        st.warning("Please enter your username and password")
-
-def main():
-    if (
-        authentication_required
-        and "credentials" in st.secrets
-        and authenticator is not None
-    ):
-        authenticator.login()
-        if not st.session_state["authentication_status"]:
-            login()
-            return
-        else:
-            authenticator.logout(location="main")
-
-    st.title(assistant_title)
-
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    st.markdown('<div class="chat-header"><h2>Chat</h2></div>', unsafe_allow_html=True)
-    st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
-
-    render_chat()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    user_msg = st.text_input(
-        "Type a message", key="input", on_change=disable_form, disabled=st.session_state.in_progress
-    )
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    if user_msg:
-        with st.chat_message("user"):
-            st.markdown(user_msg, True)
-        st.session_state.chat_log.append({"name": "user", "msg": user_msg})
-        run_stream(user_msg)
-        st.session_state.in_progress = False
-        st.session_state.tool_call = None
-        st.experimental_rerun()
-
-if __name__ == "__main__":
-    main()
+    elif
