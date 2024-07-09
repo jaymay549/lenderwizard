@@ -24,6 +24,7 @@ st.markdown(
     <style>
     .stApp {
         background-color: #f3f4f6;
+        color: black;
     }
     .chat-container {
         background: white;
@@ -163,111 +164,4 @@ class EventHandler(AssistantEventHandler):
             if delta.code_interpreter.input:
                 st.session_state.current_tool_input += delta.code_interpreter.input
                 input_code = f"### code interpreter\ninput:\n```python\n{st.session_state.current_tool_input}\n```"
-                st.session_state.current_tool_input_markdown.markdown(input_code, True)
-
-    @override
-    def on_tool_call_done(self, tool_call):
-        st.session_state.tool_calls.append(tool_call)
-        if tool_call.type == "code_interpreter":
-            if tool_call.id in [x.id for x in st.session_state.tool_calls]:
-                return
-            input_code = f"### code interpreter\ninput:\n```python\n{tool_call.code_interpreter.input}\n```"
-            st.session_state.current_tool_input_markdown.markdown(input_code, True)
-            st.session_state.chat_log.append({"name": "assistant", "msg": input_code})
-            st.session_state.current_tool_input_markdown = None
-            for output in tool_call.code_interpreter.outputs:
-                if output.type == "logs":
-                    output = f"### code interpreter\noutput:\n```\n{output.logs}\n```"
-                    with st.chat_message("Assistant"):
-                        st.markdown(output, True)
-                        st.session_state.chat_log.append(
-                            {"name": "assistant", "msg": output}
-                        )
-        elif (
-            tool_call.type == "function"
-            and self.current_run.status == "requires_action"
-        ):
-            with st.chat_message("Assistant"):
-                msg = f"### Function Calling: {tool_call.function.name}"
-                st.markdown(msg, True)
-                st.session_state.chat_log.append({"name": "assistant", "msg": msg})
-            tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
-            tool_outputs = []
-            for submit_tool_call in tool_calls:
-                tool_function_name = submit_tool_call.function.name
-                tool_function_arguments = json.loads(
-                    submit_tool_call.function.arguments
-                )
-                tool_function_output = TOOL_MAP[tool_function_name](
-                    **tool_function_arguments
-                )
-                tool_outputs.append(
-                    {
-                        "tool_call_id": submit_tool_call.id,
-                        "output": tool_function_output,
-                    }
-                )
-
-            with client.beta.threads.runs.submit_tool_outputs_stream(
-                thread_id=st.session_state.thread.id,
-                run_id=self.current_run.id,
-                tool_outputs=tool_outputs,
-                event_handler=EventHandler(),
-            ) as stream:
-                stream.until_done()
-
-def create_thread(content):
-    messages = [
-        {
-            "role": "user",
-            "content": content,
-        }
-    ]
-    thread = client.beta.threads.create()
-    return thread
-
-def create_message(thread, content):
-    client.beta.threads.messages.create(
-        thread_id=thread.id, role="user", content=content, attachments=[]
-    )
-
-def run_stream(user_input):
-    if "thread" not in st.session_state:
-        st.session_state.thread = create_thread(user_input)
-    create_message(st.session_state.thread, user_input)
-    with client.beta.threads.runs.stream(
-        thread_id=st.session_state.thread.id,
-        assistant_id=assistant_id,
-        event_handler=EventHandler(),
-    ) as stream:
-        stream.until_done()
-
-def render_chat():
-    for chat in st.session_state.chat_log:
-        if chat["name"] == "user":
-            st.markdown(
-                f'<div class="chat-message user"><div class="message-content">{chat["msg"]}</div></div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f'<div class="chat-message assistant"><div class="message-content">{chat["msg"]}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-if "tool_call" not in st.session_state:
-    st.session_state.tool_calls = []
-
-if "chat_log" not in st.session_state:
-    st.session_state.chat_log = []
-
-if "in_progress" not in st.session_state:
-    st.session_state.in_progress = False
-
-def disable_form():
-    st.session_state.in_progress = True
-
-def login():
-    if st.session_state["authentication_status"] is False:
-        st.error("Username/password is incorrect")
-    elif
+                st.session_state.current_tool_input_markdo
