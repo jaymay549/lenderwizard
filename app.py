@@ -1,8 +1,6 @@
 import os
-import base64
 import re
 import json
-
 import streamlit as st
 import openai
 from openai import AssistantEventHandler
@@ -13,12 +11,18 @@ import streamlit_authenticator as stauth
 
 load_dotenv()
 
+# Configure the page
+st.set_page_config(
+    page_title="Assistants API UI",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+    background_color="#FFFFFF",
+)
 
 def str_to_bool(str_input):
     if not isinstance(str_input, str):
         return False
     return str_input.lower() == "true"
-
 
 # Load environment variables
 azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
@@ -26,12 +30,7 @@ azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
 openai_api_key = os.environ.get("OPENAI_API_KEY")
 authentication_required = str_to_bool(os.environ.get("AUTHENTICATION_REQUIRED", False))
 assistant_id = os.environ.get("ASSISTANT_ID")
-instructions = os.environ.get("RUN_INSTRUCTIONS", "")
 assistant_title = os.environ.get("ASSISTANT_TITLE", "Assistants API UI")
-enabled_file_upload_message = os.environ.get(
-    "ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file"
-)
-
 
 # Load authentication configuration
 if authentication_required:
@@ -54,7 +53,6 @@ if azure_openai_endpoint and azure_openai_key:
     )
 else:
     client = openai.OpenAI(api_key=openai_api_key)
-
 
 class EventHandler(AssistantEventHandler):
     @override
@@ -80,9 +78,8 @@ class EventHandler(AssistantEventHandler):
 
     @override
     def on_text_done(self, text):
-        format_text = format_annotation(text)
-        st.session_state.current_markdown.markdown(format_text, True)
-        st.session_state.chat_log.append({"name": "assistant", "msg": format_text})
+        st.session_state.current_markdown.markdown(text.value, True)
+        st.session_state.chat_log.append({"name": "assistant", "msg": text.value})
 
     @override
     def on_tool_call_created(self, tool_call):
@@ -102,11 +99,6 @@ class EventHandler(AssistantEventHandler):
                 st.session_state.current_tool_input += delta.code_interpreter.input
                 input_code = f"### code interpreter\ninput:\n```python\n{st.session_state.current_tool_input}\n```"
                 st.session_state.current_tool_input_markdown.markdown(input_code, True)
-
-            if delta.code_interpreter.outputs:
-                for output in delta.code_interpreter.outputs:
-                    if output.type == "logs":
-                        pass
 
     @override
     def on_tool_call_done(self, tool_call):
@@ -159,64 +151,25 @@ class EventHandler(AssistantEventHandler):
             ) as stream:
                 stream.until_done()
 
-
-def create_thread(content, file):
+def create_thread(content):
     messages = [
         {
             "role": "user",
             "content": content,
         }
     ]
-    if file is not None:
-        messages[0].update({"file_ids": [file.id]})
     thread = client.beta.threads.create()
     return thread
 
-
-def create_message(thread, content, file):
-    attachments = []
-    if file is not None:
-        attachments.append(
-            {"file_id": file.id, "tools": [{"type": "code_interpreter"}]}
-        )
+def create_message(thread, content):
     client.beta.threads.messages.create(
-        thread_id=thread.id, role="user", content=content, attachments=attachments
+        thread_id=thread.id, role="user", content=content, attachments=[]
     )
 
-
-def create_file_link(file_name, file_id):
-    content = client.files.content(file_id)
-    content_type = content.response.headers["content-type"]
-    b64 = base64.b64encode(content.text.encode(content.encoding)).decode()
-    link_tag = f'<a href="data:{content_type};base64,{b64}" download="{file_name}">Download Link</a>'
-    return link_tag
-
-
-def format_annotation(text):
-    citations = []
-    text_value = text.value
-    for index, annotation in enumerate(text.annotations):
-        text_value = text.value.replace(annotation.text, f" [{index}]")
-
-        if file_citation := getattr(annotation, "file_citation", None):
-            cited_file = client.files.retrieve(file_citation.file_id)
-            citations.append(
-                f"[{index}] {file_citation.quote} from {cited_file.filename}"
-            )
-        elif file_path := getattr(annotation, "file_path", None):
-            link_tag = create_file_link(
-                annotation.text.split("/")[-1],
-                file_path.file_id,
-            )
-            text_value = re.sub(r"\[(.*?)\]\s*\(\s*(.*?)\s*\)", link_tag, text_value)
-    text_value += "\n\n" + "\n".join(citations)
-    return text_value
-
-
-def run_stream(user_input, file):
+def run_stream(user_input):
     if "thread" not in st.session_state:
-        st.session_state.thread = create_thread(user_input, file)
-    create_message(st.session_state.thread, user_input, file)
+        st.session_state.thread = create_thread(user_input)
+    create_message(st.session_state.thread, user_input)
     with client.beta.threads.runs.stream(
         thread_id=st.session_state.thread.id,
         assistant_id=assistant_id,
@@ -224,17 +177,10 @@ def run_stream(user_input, file):
     ) as stream:
         stream.until_done()
 
-
-def handle_uploaded_file(uploaded_file):
-    file = client.files.create(file=uploaded_file, purpose="assistants")
-    return file
-
-
 def render_chat():
     for chat in st.session_state.chat_log:
         with st.chat_message(chat["name"]):
             st.markdown(chat["msg"], True)
-
 
 if "tool_call" not in st.session_state:
     st.session_state.tool_calls = []
@@ -245,17 +191,14 @@ if "chat_log" not in st.session_state:
 if "in_progress" not in st.session_state:
     st.session_state.in_progress = False
 
-
 def disable_form():
     st.session_state.in_progress = True
-
 
 def login():
     if st.session_state["authentication_status"] is False:
         st.error("Username/password is incorrect")
     elif st.session_state["authentication_status"] is None:
         st.warning("Please enter your username and password")
-
 
 def main():
     if (
@@ -268,49 +211,24 @@ def main():
             login()
             return
         else:
-            authenticator.logout(location="sidebar")
+            authenticator.logout(location="main")
 
     st.title(assistant_title)
     user_msg = st.chat_input(
         "Message", on_submit=disable_form, disabled=st.session_state.in_progress
     )
 
-    if enabled_file_upload_message:
-        uploaded_file = st.sidebar.file_uploader(
-            enabled_file_upload_message,
-            type=[
-                "txt",
-                "pdf",
-                "png",
-                "jpg",
-                "jpeg",
-                "csv",
-                "json",
-                "geojson",
-                "xlsx",
-                "xls",
-            ],
-            disabled=st.session_state.in_progress,
-        )
-    else:
-        uploaded_file = None
-
     if user_msg:
         render_chat()
         with st.chat_message("user"):
             st.markdown(user_msg, True)
         st.session_state.chat_log.append({"name": "user", "msg": user_msg})
-
-        file = None
-        if uploaded_file is not None:
-            file = handle_uploaded_file(uploaded_file)
-        run_stream(user_msg, file)
+        run_stream(user_msg)
         st.session_state.in_progress = False
         st.session_state.tool_call = None
         st.rerun()
 
     render_chat()
-
 
 if __name__ == "__main__":
     main()
