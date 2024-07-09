@@ -18,12 +18,66 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for background color
+# Custom CSS for chat UI
 st.markdown(
     """
     <style>
     .stApp {
-        background-color: white;
+        background-color: #f3f4f6;
+    }
+    .chat-container {
+        background: white;
+        border-radius: 8px;
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .chat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    .chat-messages {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+    }
+    .chat-input {
+        display: flex;
+        align-items: center;
+    }
+    .chat-input input {
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: 10px 20px;
+        margin-right: 10px;
+    }
+    .chat-message {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .chat-message.user {
+        justify-content: flex-end;
+    }
+    .chat-message.user .message-content {
+        background: #DCF8C6;
+        color: black;
+    }
+    .chat-message.assistant .message-content {
+        background: #ECECEC;
+        color: black;
+    }
+    .message-content {
+        max-width: 60%;
+        padding: 10px 20px;
+        border-radius: 20px;
+        margin-left: 10px;
     }
     </style>
     """,
@@ -225,21 +279,29 @@ def main():
             authenticator.logout(location="main")
 
     st.title(assistant_title)
-    user_msg = st.chat_input(
-        "Message", on_submit=disable_form, disabled=st.session_state.in_progress
+
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    st.markdown('<div class="chat-header"><h2>Chat</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
+
+    render_chat()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    user_msg = st.text_input(
+        "Type a message", key="input", on_change=disable_form, disabled=st.session_state.in_progress
     )
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if user_msg:
-        render_chat()
         with st.chat_message("user"):
             st.markdown(user_msg, True)
         st.session_state.chat_log.append({"name": "user", "msg": user_msg})
         run_stream(user_msg)
         st.session_state.in_progress = False
         st.session_state.tool_call = None
-        st.rerun()
-
-    render_chat()
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
