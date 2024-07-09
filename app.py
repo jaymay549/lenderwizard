@@ -15,8 +15,19 @@ load_dotenv()
 st.set_page_config(
     page_title="Assistants API UI",
     layout="wide",
-    initial_sidebar_state="collapsed",
-    background_color="#FFFFFF",
+    initial_sidebar_state="collapsed"
+)
+
+# Custom CSS for background color
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 def str_to_bool(str_input):
